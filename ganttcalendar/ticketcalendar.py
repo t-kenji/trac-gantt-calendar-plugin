@@ -99,105 +99,105 @@ class TicketCalendarPlugin(Component):
             next = cday.replace(day=1).__add__(timedelta(days=32)).replace(day=1)
 
         # process ticket
-        db = self.env.get_db_cnx()
-        cursor = db.cursor();
-        my_ticket_sql = ""
-        self.log.debug("myticket")
-        self.log.debug(show_my_ticket)
-        if show_my_ticket=="on":
-            my_ticket_sql = "AND owner = '" + req.authname + "'"
-        closed_ticket_sql = ""
-        if show_closed_ticket != 'on':
-            closed_ticket_sql = "AND status <> 'closed'"
-        selected_milestone_sql = ""
-        if selected_milestone != None and selected_milestone != "":
-            selected_milestone_sql = "AND milestone = '" + selected_milestone  + "'"
+        with self.env.db_query as db:
+            cursor = db.cursor();
+            my_ticket_sql = ""
+            self.log.debug("myticket")
+            self.log.debug(show_my_ticket)
+            if show_my_ticket=="on":
+                my_ticket_sql = "AND owner = '" + req.authname + "'"
+            closed_ticket_sql = ""
+            if show_closed_ticket != 'on':
+                closed_ticket_sql = "AND status <> 'closed'"
+            selected_milestone_sql = ""
+            if selected_milestone != None and selected_milestone != "":
+                selected_milestone_sql = "AND milestone = '" + selected_milestone  + "'"
 
-        sql = ("SELECT id, type, summary, owner, description, status, resolution, priority, a.value, c.value, cmp.value, est.value, tot.value from ticket t "
-                    "JOIN ticket_custom a ON a.ticket = t.id AND a.name = 'due_assign' "
-                    "JOIN ticket_custom c ON c.ticket = t.id AND c.name = 'due_close' "
-                    "JOIN ticket_custom cmp ON cmp.ticket = t.id AND cmp.name = 'complete' "
-                    "LEFT OUTER JOIN ticket_custom est ON est.ticket = t.id AND est.name = 'estimatedhours' "
-                    "LEFT OUTER JOIN ticket_custom tot ON tot.ticket = t.id AND tot.name = 'totalhours' "
-                    "WHERE ((a.value >= '%s' AND a.value <= '%s' ) "
-                    "OR (c.value >= '%s' AND c.value <= '%s')) %s %s %s" %
-                    (first.strftime(dateFormat),
-                        last.strftime(dateFormat),
-                        first.strftime(dateFormat),
-                        last.strftime(dateFormat),
-                        my_ticket_sql,
-                        closed_ticket_sql,
-                        selected_milestone_sql))
+            sql = ("SELECT id, type, summary, owner, description, status, resolution, priority, a.value, c.value, cmp.value, est.value, tot.value from ticket t "
+                        "JOIN ticket_custom a ON a.ticket = t.id AND a.name = 'due_assign' "
+                        "JOIN ticket_custom c ON c.ticket = t.id AND c.name = 'due_close' "
+                        "JOIN ticket_custom cmp ON cmp.ticket = t.id AND cmp.name = 'complete' "
+                        "LEFT OUTER JOIN ticket_custom est ON est.ticket = t.id AND est.name = 'estimatedhours' "
+                        "LEFT OUTER JOIN ticket_custom tot ON tot.ticket = t.id AND tot.name = 'totalhours' "
+                        "WHERE ((a.value >= '%s' AND a.value <= '%s' ) "
+                        "OR (c.value >= '%s' AND c.value <= '%s')) %s %s %s" %
+                        (first.strftime(dateFormat),
+                            last.strftime(dateFormat),
+                            first.strftime(dateFormat),
+                            last.strftime(dateFormat),
+                            my_ticket_sql,
+                            closed_ticket_sql,
+                            selected_milestone_sql))
 
-        self.log.debug(sql)
-        cursor.execute(sql)
-
-        sum_estimatedhours = 0.0
-        sum_totalhours = 0.0
-        sum_est_isNone = True
-
-        tickets=[]
-        for id, type, summary, owner, description, status, resolution, priority, due_assign, due_close, complete, estimatedhours, totalhours in cursor:
-            due_assign_date = None
-            due_close_date = None
-            try:
-                t = time.strptime(due_assign, dateFormat)
-                due_assign_date = date(t[0],t[1],t[2])
-            except ( TracError, ValueError, TypeError):
-                pass
-            try:
-                t = time.strptime(due_close, dateFormat)
-                due_close_date = date(t[0],t[1],t[2])
-            except ( TracError, ValueError, TypeError):
-                pass
-            if complete != None and len(complete)>1 and complete[len(complete)-1]=='%':
-                complete = complete[0:len(complete)-1]
-            try:
-                if int(complete) >100:
-                    complete = "100"
-            except:
-                complete = "0"
-            complete = int(complete)
-            if (due_assign_date and due_close_date) \
-              and (due_assign_date > due_close_date):
-                continue
-            # time tracking
-            if estimatedhours != None:
-                estimatedhours = _to_float(estimatedhours, default=0.0)
-                sum_estimatedhours += estimatedhours
-                sum_est_isNone = False
-            if totalhours != None:
-                totalhours = _to_float(totalhours, default=0.0)
-                sum_totalhours += totalhours
-            else: totalhours = 0.0
-            ticket = {'id':id, 'type':type, 'summary':summary, 'owner':owner, 'description': description,
-                      'status':status, 'resolution':resolution, 'priority':priority,
-                      'due_assign':due_assign_date, 'due_close':due_close_date, 'complete': complete,
-                      'estimatedhours':estimatedhours, 'totalhours':totalhours}
-            tickets.append(ticket)
-        # time tracking
-        if sum_est_isNone: sum_estimatedhours = None
-
-        # get roadmap
-        sql = ("SELECT name, due, completed, description FROM milestone")
-        self.log.debug(sql)
-        cursor.execute(sql)
-
-        milestones = [{}]
-        for name, due, completed, description in cursor:
-            milestone = {'name':name, 'completed':completed != 0,'description':description}
-            if due!=0:
-                milestone['due']= to_datetime(due, req.tz).date()
-            milestones.append(milestone)
-
-        holidays = {}
-        sql = "SELECT date,description from holiday"
-        try:
+            self.log.debug(sql)
             cursor.execute(sql)
-            for hol_date,hol_desc in cursor:
-                holidays[hol_date]= hol_desc
-        except:
-            pass
+
+            sum_estimatedhours = 0.0
+            sum_totalhours = 0.0
+            sum_est_isNone = True
+
+            tickets=[]
+            for id, type, summary, owner, description, status, resolution, priority, due_assign, due_close, complete, estimatedhours, totalhours in cursor:
+                due_assign_date = None
+                due_close_date = None
+                try:
+                    t = time.strptime(due_assign, dateFormat)
+                    due_assign_date = date(t[0],t[1],t[2])
+                except ( TracError, ValueError, TypeError):
+                    pass
+                try:
+                    t = time.strptime(due_close, dateFormat)
+                    due_close_date = date(t[0],t[1],t[2])
+                except ( TracError, ValueError, TypeError):
+                    pass
+                if complete != None and len(complete)>1 and complete[len(complete)-1]=='%':
+                    complete = complete[0:len(complete)-1]
+                try:
+                    if int(complete) >100:
+                        complete = "100"
+                except:
+                    complete = "0"
+                complete = int(complete)
+                if (due_assign_date and due_close_date) \
+                  and (due_assign_date > due_close_date):
+                    continue
+                # time tracking
+                if estimatedhours != None:
+                    estimatedhours = _to_float(estimatedhours, default=0.0)
+                    sum_estimatedhours += estimatedhours
+                    sum_est_isNone = False
+                if totalhours != None:
+                    totalhours = _to_float(totalhours, default=0.0)
+                    sum_totalhours += totalhours
+                else: totalhours = 0.0
+                ticket = {'id':id, 'type':type, 'summary':summary, 'owner':owner, 'description': description,
+                          'status':status, 'resolution':resolution, 'priority':priority,
+                          'due_assign':due_assign_date, 'due_close':due_close_date, 'complete': complete,
+                          'estimatedhours':estimatedhours, 'totalhours':totalhours}
+                tickets.append(ticket)
+            # time tracking
+            if sum_est_isNone: sum_estimatedhours = None
+
+            # get roadmap
+            sql = ("SELECT name, due, completed, description FROM milestone")
+            self.log.debug(sql)
+            cursor.execute(sql)
+
+            milestones = [{}]
+            for name, due, completed, description in cursor:
+                milestone = {'name':name, 'completed':completed != 0,'description':description}
+                if due!=0:
+                    milestone['due']= to_datetime(due, req.tz).date()
+                milestones.append(milestone)
+
+            holidays = {}
+            sql = "SELECT date,description from holiday"
+            try:
+                cursor.execute(sql)
+                for hol_date,hol_desc in cursor:
+                    holidays[hol_date]= hol_desc
+            except:
+                pass
 
         #days
         days={}

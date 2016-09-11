@@ -38,13 +38,13 @@ class CompleteTicketObserver(Component):
                 return old_values[field]
             # for INSERT: save_ticket_change
             else:
-                db = self.env.get_db_cnx()
-                cursor = db.cursor()
-                cursor.execute("SELECT * FROM ticket_custom where ticket=%s and name=%s" , (ticket.id, field))
-                val = cursor.fetchone()
-                if val:
-                    return val[2]
-                return default
+                with self.env.db_query as db:
+                    cursor = db.cursor()
+                    cursor.execute("SELECT * FROM ticket_custom where ticket=%s and name=%s" , (ticket.id, field))
+                    val = cursor.fetchone()
+                    if val:
+                        return val[2]
+                    return default
         ########################
 
         def writeTicketValue(field, oldvalue, newvalue):
@@ -58,11 +58,11 @@ class CompleteTicketObserver(Component):
                 author = ticket.values["reporter"]
             self.log.debug("oldvalue: '%s', newvalue: '%s'" % (oldvalue, newvalue))
             #self.log.debug("changelog: %s" % cl)
-            db = self.env.get_db_cnx()
-            if cl:
-                save_ticket_change( db, ticket.id, author, change_time, field, oldvalue, newvalue, self.log)
-            save_custom_field_value( db, ticket.id, field, newvalue)
-            db.commit();
+            with self.env.db_transaction as db:
+                if cl:
+                    save_ticket_change( db, ticket.id, author, change_time, field, oldvalue, newvalue, self.log)
+                save_custom_field_value( db, ticket.id, field, newvalue)
+                db.commit();
         ########################
 
 
