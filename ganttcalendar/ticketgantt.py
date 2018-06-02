@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from genshi.builder import tag
 
 from trac import __version__
-from trac.config import IntOption, BoolOption, Option
+from trac.config import IntOption, BoolOption, ListOption, Option
 from trac.core import Component, implements, TracError
 from trac.db.api import get_column_names
 from trac.ticket.api import TicketSystem
@@ -50,6 +50,8 @@ class TicketGanttChartPlugin(Component):
         doc="""Default zoom mode in gantchar. (default: 3)""")
     format = Option('ganttcalendar', 'format', '%Y/%m/%d',
         doc="""Date format for due assign and due finish""")
+    tooltip_fields = ListOption('ganttcalendar', 'tooltip_fields', '',
+        doc="""Show ticket-custom fields on tooltip""")
 
     substitutions = ['$USER']
     clause_re = re.compile(r'(?P<clause>\d+)_(?P<field>.+)$')
@@ -306,10 +308,16 @@ class TicketGanttChartPlugin(Component):
                 fields_data[name] = field
 
             ###### get_sql
+            custom_select = ""
             custom_join = ""
             custom_fields = [f['name'] for f in fields if f.get('custom')]
 
             # Join with ticket_custom table as necessary
+            for k in [k for k in self.tooltip_fields if k in custom_fields]:
+                qk = db.quote(k)
+                custom_select += (", %s.value AS %s" % (qk, k))
+                custom_join += (" LEFT OUTER JOIN ticket_custom AS %s ON " \
+                                "(t.id=%s.ticket AND %s.name='%s')" % (qk, qk, qk, k))
             for k in [k for k in constraint_cols if k in custom_fields]:
                 qk = db.quote(k)
                 custom_join += (" LEFT OUTER JOIN ticket_custom AS %s ON " \
@@ -502,14 +510,14 @@ class TicketGanttChartPlugin(Component):
                 SELECT id, type, summary, owner, t.description, status, resolution,
                        priority, a.value AS due_assign, c.value AS due_close,
                        cmp.value AS complete, est.value AS estimatedhours,
-                       tot.value AS totalhours, milestone, component
+                       tot.value AS totalhours, milestone, component %s
                 FROM ticket t
                 JOIN ticket_custom a ON a.ticket=t.id AND a.name='due_assign'
                 JOIN ticket_custom c ON c.ticket=t.id AND c.name='due_close'
                 JOIN ticket_custom cmp ON cmp.ticket=t.id AND cmp.name='complete'
                 LEFT OUTER JOIN ticket_custom est ON est.ticket=t.id AND est.name='estimatedhours'
                 LEFT OUTER JOIN ticket_custom tot ON tot.ticket=t.id AND tot.name='totalhours'
-                %s %s ORDER BY %s, a.value""" % (custom_join, condition, sort_expr)
+                %s %s ORDER BY %s, a.value""" % (custom_select, custom_join, condition, sort_expr)
 
             if not errors:
                 cursor.execute(sql, args)
@@ -657,6 +665,7 @@ class TicketGanttChartPlugin(Component):
             'calendar': calendar, 'dateFormat': dateFormat,
             'first_wkday': first_wkday, 'normal': default_zoom_mode,
             'zoom': current_zoom_mode, '_': _, 'fields': fields_data,
+            'tooltip_fields': self.tooltip_fields,
             'clauses': clauses_data, 'modes': self.get_modes(),
         }
 

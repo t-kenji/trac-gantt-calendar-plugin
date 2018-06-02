@@ -347,6 +347,9 @@
           </div>
           <div py:if="show_ticket_status == 'on'" py:attrs="{'title':tic_tip}" py:choose="" class="tic_summary" style="left:${int(e*px_dw)+5}px;top:${px_ti*cnt+px_hd+(px_ti-px_ch)/2+(ti_mrgn/2-1)+px_top}px;">
             ${t['status']}<span py:when="t['status']!='closed'"> ${t['complete']}%</span><span py:otherwise="">: ${t['resolution']}</span><span py:if="t['estimatedhours']!=None"> ${t['totalhours']}h</span> ${t['owner']}
+            <py:for each="field in tooltip_fields">
+              <span>${t[field]}</span>
+            </py:for>
           </div>
         </py:with>
     </py:if>
@@ -398,16 +401,19 @@
                 <br/>
                 <s py:strip="t['status']!='closed'">  ${t['type']} #${t['id']}</s>: ${t['summary']}<br/>
                 <br/>
-                <strong>${_('Start date')}</strong>:
+                <strong>${fields['due_assign'].label}</strong>:
                 ${t['due_assign'].strftime(dateFormat)}
                   <span py:if="t['status']!='closed'">(${t['status']} ${t['complete']}%)</span><br/>
-                <strong>${_('End date')}</strong>:
+                <strong>${fields['due_close'].label}</strong>:
                   ${t['due_close'].strftime(dateFormat)}
                   <span py:if="t['status']=='closed'">(${t['status']}: ${t['resolution']})</span><br/>
-                <strong>${_('Owner')}</strong>:      ${format_author(t['owner'])}<br/>
-                <strong>${_('Priority')}</strong>:            ${t['priority']}<br/>
+                <strong>${fields['owner'].label}</strong>:      ${format_author(t['owner'])}<br/>
+                <strong>${fields['priority'].label}</strong>:            ${t['priority']}<br/>
               <py:if test="t['estimatedhours']!=None">
-                <strong>${_('Total Hours')}</strong>: ${t['totalhours']}h &nbsp;/&nbsp; <strong>${_('Estimated Hours')}</strong>: ${t['estimatedhours']}h<br/>
+                <strong>${fields['totalhours'].label}</strong>: ${t['totalhours']}h &nbsp;/&nbsp; <strong>${fields['estimatedhours'].label}</strong>: ${t['estimatedhours']}h<br/>
+              </py:if>
+              <py:if test="t['cur_situ']!=None">
+                <strong>${fields['cur_situ'].label}</strong>: ${t['cur_situ']}<br/>
               </py:if>
                 <pre> ${t['description']}</pre>
               </span>
