@@ -346,7 +346,7 @@
             </a>
           </div>
           <div py:if="show_ticket_status == 'on'" py:attrs="{'title':tic_tip}" py:choose="" class="tic_summary" style="left:${int(e*px_dw)+5}px;top:${px_ti*cnt+px_hd+(px_ti-px_ch)/2+(ti_mrgn/2-1)+px_top}px;">
-            ${t['status']}<span py:when="t['status']!='closed'"> ${t['complete']}%</span><span py:otherwise="">: ${t['resolution']}</span><span py:if="t['estimatedhours']!=None"> ${t['totalhours']}h</span> ${t['owner']}
+		  ${t['status']}<span py:when="t['status']!='closed'"> ${t['complete']}%</span><span py:otherwise="">: ${t['resolution']}</span><span py:if="t['estimatedhours']!=None"> ${t['totalhours']}h / ${t['estimatedhours']}h</span> ${t['owner']}
             <py:for each="field in tooltip_fields">
               <span>${t[field]}</span>
             </py:for>
